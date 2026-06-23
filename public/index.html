@@ -131,9 +131,44 @@
   .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
   .card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
   .card-title-row .card-title { margin-bottom: 0; }
+  .card-collapse-btn {
+    background: none; border: none; cursor: pointer; color: var(--text-light);
+    font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+    transition: background .15s, color .15s; flex-shrink: 0; margin-left: 8px;
+  }
+  .card-collapse-btn:hover { background: #eef1ec; color: var(--text-muted); }
+  .card.card-collapsed { padding-bottom: 1rem; }
+  .card.card-collapsed .card-title { margin-bottom: 0; }
+  .chart-producto-multi { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.25rem; }
+  .chart-producto-item { display:flex; flex-direction:column; align-items:center; }
+  .chart-producto-item-title { font-size:12px; font-weight:700; color:var(--text-dark,#2b332c); margin-bottom:0.5rem; text-align:center; }
+  .chart-producto-item-canvas-wrap { width:100%; height:220px; position:relative; }
+  .quick-search-wrap { position:relative; flex:1; min-width:220px; max-width:320px; }
+  .quick-search-input { width:100%; padding:7px 12px; border-radius:7px; border:1px solid var(--border); background:var(--surface); font-size:13px; color:var(--text); box-sizing:border-box; }
+  .quick-search-input:focus { outline:none; border-color:var(--green-mid,#6fa37a); }
+  .quick-search-results { position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:7px; box-shadow:0 4px 14px rgba(0,0,0,0.08); max-height:260px; overflow-y:auto; z-index:50; display:none; }
+  .quick-search-results.open { display:block; }
+  .quick-search-result-item { padding:8px 12px; font-size:13px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .quick-search-result-item:hover { background:#eef1ec; }
+  .quick-search-result-item .qsr-kg { font-size:11px; color:var(--text-light); white-space:nowrap; }
+  .quick-search-no-results { padding:10px 12px; font-size:12.5px; color:var(--text-light); }
+  .quick-search-clear-row { padding:6px 12px; border-top:1px solid var(--border); }
+  .quick-search-clear-row button { font-size:12px; color:var(--text-muted); background:none; border:none; cursor:pointer; padding:0; }
+  .quick-search-clear-row button:hover { color:var(--text); text-decoration:underline; }
   .compare-picker { position: relative; }
   .month-picker-btn.small { padding: 4px 8px; font-size: 12px; min-width: auto; }
   .chart-wrap { position: relative; width: 100%; }
+  .precio-table-wrap { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+  .precio-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .precio-table thead th { position: sticky; top: 0; background: var(--surface); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); z-index: 1; }
+  .precio-table th.num, .precio-table td.num { text-align: right; }
+  .precio-table th.centro, .precio-table td.centro { text-align: center; }
+  .precio-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .precio-table tbody tr.precio-group-start td { border-top: 2px solid var(--border); }
+  .precio-table tbody tr.precio-group-start:first-child td { border-top: none; }
+  .precio-table td.producto-cell { font-weight: 600; vertical-align: middle; color: var(--green-dark); background: var(--green-pale); border-right: 1px solid var(--border); }
+  .precio-table tbody tr.precio-grupo-b td:not(.producto-cell) { background: rgba(0,0,0,0.015); }
+  .precio-table tbody tr:hover td:not(.producto-cell) { background: var(--blue-pale); }
 
   /* P&L TABLE */
   .pnl { width: 100%; }
@@ -316,9 +351,16 @@
 <!-- ===================== OPERACIONAL ===================== -->
 <div id="page-operacional" class="page active">
 
-  <button class="filters-toggle-btn" id="toggle-filters-op" onclick="toggleFiltersPanel('op')">
-    🔍 Filtros <span class="filters-active-summary" id="filters-summary-op"></span> <span class="arrow">▾</span>
-  </button>
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:1rem;">
+    <button class="filters-toggle-btn" id="toggle-filters-op" onclick="toggleFiltersPanel('op')" style="margin-bottom:0;">
+      🔍 Filtros <span class="filters-active-summary" id="filters-summary-op"></span> <span class="arrow">▾</span>
+    </button>
+    <div class="quick-search-wrap" id="quick-search-wrap-op">
+      <input type="text" id="quick-search-op" class="quick-search-input" placeholder="🔎 Buscar fruta/verdura..." autocomplete="off"
+        oninput="onQuickSearchInput('op', this.value)" onfocus="onQuickSearchInput('op', this.value)">
+      <div class="quick-search-results" id="quick-search-results-op"></div>
+    </div>
+  </div>
 
   <div class="filters-panel" id="filters-panel-op">
     <div class="filters">
@@ -398,8 +440,7 @@
       <div class="card-title" id="title-chartPrecio" style="margin-bottom:0">Precio medio por fruta/verdura (€/kg)</div>
       <button id="precio-expand-btn" class="btn" style="font-size:12px;padding:4px 10px;display:none;" onclick="_precioExpanded=!_precioExpanded;renderPrecioChart()">▼ Ver todas</button>
     </div>
-    <div id="precio-legend" style="display:flex;flex-wrap:wrap;align-items:center;margin-bottom:0.75rem;gap:4px;"></div>
-    <div class="chart-wrap" id="precio-chart-wrap" style="height:240px"><canvas id="chartPrecio" role="img" aria-label="Precio medio compra y venta por producto">Precio medio compra/venta.</canvas></div>
+    <div id="precio-table-wrap" class="precio-table-wrap"></div>
   </div>
 
   <div class="card">
@@ -424,7 +465,7 @@
 
   <div class="card">
     <div class="card-title" id="title-chartProducto">Distribución por fruta/verdura (kg vendidos)</div>
-    <div class="chart-wrap" style="height:240px"><canvas id="chartProducto" role="img" aria-label="Distribución por producto">Distribución por producto.</canvas></div>
+    <div id="chartProducto-wrap" class="chart-producto-multi"></div>
   </div>
 
 </div>
@@ -554,100 +595,40 @@ let _precioYears=[];
 function renderPrecioChart(){
   const frutas=_precioExpanded?_precioAllLabels:_precioAllLabels.slice(0,_PRECIO_PAGE);
   const años=[..._precioYears].sort((a,b)=>a-b);
-  const wrap=document.getElementById('precio-chart-wrap');
-  const COMPRA_COLORS=['#1a5fa8','#2d7a4f','#d4820a','#534AB7','#993C1D','#993556','#888'];
-  const VENTA_COLORS=['#64b5f6','#81c995','#ffcc80','#9fa8da','#ef9a9a','#f48fb1','#ccc'];
-  // Crear patrones de rayas para compra
-  function makeHatchPattern(color){
-    const c=document.createElement('canvas'); c.width=8; c.height=8;
-    const cx=c.getContext('2d');
-    cx.fillStyle=color; cx.fillRect(0,0,8,8);
-    cx.strokeStyle='rgba(255,255,255,0.55)'; cx.lineWidth=1.5;
-    cx.beginPath(); cx.moveTo(0,8); cx.lineTo(8,0); cx.stroke();
-    cx.beginPath(); cx.moveTo(-2,2); cx.lineTo(2,-2); cx.stroke();
-    cx.beginPath(); cx.moveTo(6,10); cx.lineTo(10,6); cx.stroke();
-    return document.getElementById('chartPrecio').getContext('2d').createPattern(c,'repeat');
-  }
-  // Compra y venta apiladas en la misma barra por año (stack por año)
-  const datasets=[];
-  años.forEach((año,i)=>{
-    const baseColor=COMPRA_COLORS[i%COMPRA_COLORS.length];
-    datasets.push({
-      label:String(año)+' Compra',
-      data:frutas.map(f=>_precioAllData[año]?.[f]??null),
-      backgroundColor:makeHatchPattern(baseColor),
-      borderColor:baseColor, borderWidth:1,
-      borderRadius:0, stack:'año'+año, _tipo:'Compra', _año:año
-    });
-    datasets.push({
-      label:String(año)+' Venta',
-      data:frutas.map(f=>_precioVentaAllData[año]?.[f]??null),
-      backgroundColor:VENTA_COLORS[i%VENTA_COLORS.length],
-      borderRadius:2, stack:'año'+año, _tipo:'Venta', _año:año
+  const wrap=document.getElementById('precio-table-wrap');
+  if(!wrap) return;
+
+  const fmtP = v => (v==null) ? '—' : v.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  let filas = '';
+  frutas.forEach((fruta, idx)=>{
+    const grupoClase = idx%2===0 ? 'precio-grupo-a' : 'precio-grupo-b';
+    años.forEach((año, j)=>{
+      const pc = _precioAllData[año]?.[fruta] ?? null;
+      const pv = _precioVentaAllData[año]?.[fruta] ?? null;
+      const esInicio = j===0;
+      filas += `<tr class="${grupoClase}${esInicio?' precio-group-start':''}">`;
+      if(esInicio){
+        filas += `<td class="producto-cell" rowspan="${años.length}">${fruta}</td>`;
+      }
+      filas += `<td class="centro">${año}</td><td class="num">${fmtP(pc)}</td><td class="num">${fmtP(pv)}</td></tr>`;
     });
   });
-  const barH=años.length<=1?28:años.length*24+8;
-  wrap.style.height=Math.max(240,frutas.length*barH+60)+'px';
-  destroyC('chartPrecio');
-  charts['chartPrecio']=new Chart(document.getElementById('chartPrecio'),{
-    type:'bar',
-    data:{labels:frutas, datasets},
-    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
-      layout:{padding:{right:45}},
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          mode:'index', intersect:false,
-          callbacks:{
-            title:ctx=>ctx[0].label,
-            label:ctx=>ctx.parsed.x!=null ? ctx.dataset._año+' '+ctx.dataset._tipo+': '+ctx.parsed.x.toFixed(2)+' €/kg' : null
-          }
-        }
-      },
-      scales:{
-        x:{stacked:true, min:0, max:6, ticks:{callback:v=>v.toFixed(2)+'€'}, grid:{color:'rgba(0,0,0,0.04)'}},
-        y:{stacked:true, ticks:{font:{size:11}}}
-      }
-    },
-    plugins:[{
-      id:'yearLabels',
-      afterDraw(chart){
-        const ctx2=chart.ctx;
-        const xRight=chart.scales.x.right+6;
-        chart.data.datasets.forEach((ds,dsIdx)=>{
-          if(ds._tipo!=='Compra') return;
-          const meta=chart.getDatasetMeta(dsIdx);
-          if(meta.hidden) return;
-          meta.data.forEach(bar=>{
-            ctx2.save();
-            ctx2.fillStyle='#555';
-            ctx2.font='bold 10px system-ui,sans-serif';
-            ctx2.textAlign='left';
-            ctx2.textBaseline='middle';
-            ctx2.fillText(String(ds._año), xRight, bar.y);
-            ctx2.restore();
-          });
-        });
-      }
-    }]
-  });
-  // Leyenda personalizada debajo del título: un item por año con dos cuadros
-  const legendEl=document.getElementById('precio-legend');
-  if(legendEl){
-    legendEl.innerHTML=años.map((año,i)=>`
-      <span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px;font-size:12px;color:var(--text-muted)">
-        <span style="display:inline-flex;gap:2px;">
-          <span style="width:12px;height:12px;background:${COMPRA_COLORS[i%COMPRA_COLORS.length]};border-radius:2px;"></span>
-          <span style="width:12px;height:12px;background:${VENTA_COLORS[i%VENTA_COLORS.length]};border-radius:2px;"></span>
-        </span>
-        ${año}
-      </span>
-    `).join('')+`
-      <span style="display:inline-flex;align-items:center;gap:10px;margin-left:6px;font-size:11px;color:var(--text-light)">
-        <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;background:#555;border-radius:2px;opacity:0.7"></span> Compra</span>
-        <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;background:#aaa;border-radius:2px;opacity:0.7"></span> Venta</span>
-      </span>`;
-  }
+
+  wrap.innerHTML = `
+    <table class="precio-table">
+      <thead>
+        <tr>
+          <th>Fruta/Verdura</th>
+          <th class="centro">Año</th>
+          <th class="num">Precio medio compra (€/kg)</th>
+          <th class="num">Precio medio venta (€/kg)</th>
+        </tr>
+      </thead>
+      <tbody>${filas || `<tr><td colspan="4" style="text-align:center;color:var(--text-light);padding:1.5rem;">Sin datos para los filtros seleccionados.</td></tr>`}</tbody>
+    </table>
+  `;
+
   const btn=document.getElementById('precio-expand-btn');
   if(btn){
     btn.style.display=_precioAllLabels.length>_PRECIO_PAGE?'inline-flex':'none';
@@ -754,31 +735,69 @@ function renderInforme(){
     return;
   }
 
-  const puntos = [];
-
-  // Helper: genera un fragmento de texto con la variación interanual, listo para insertar en cualquier punto
-  function variacionTxt(actual, anterior, añoRef, conComa){
+  // Variación interanual. Cuando mismoPeriodo=true, los dos importes comparados ya corresponden
+  // exactamente a los mismos meses en ambos años (comparación YTD real), así que se indica en el texto.
+  function variacionTxt(actual, anterior, añoRef, conComa, mismoPeriodo){
     if(añoRef==null || anterior==null || anterior===0) return '';
     const varPct=((actual-anterior)/Math.abs(anterior)*100);
     const verbo = varPct>=0 ? 'más' : 'menos';
     const decimales = Math.abs(varPct)>=100 ? 0 : 1;
     const apertura = conComa ? ', ' : ' (';
     const cierre = conComa ? '' : ')';
-    return `${apertura}<strong>${Math.abs(varPct).toFixed(decimales)}% ${verbo}</strong> que en ${añoRef}${cierre}`;
+    const refTxt = mismoPeriodo ? `el mismo periodo de ${añoRef}` : añoRef;
+    return `${apertura}<strong>${Math.abs(varPct).toFixed(decimales)}% ${verbo}</strong> que en ${refTxt}${cierre}`;
   }
 
-  // ——— Datos financieros: años disponibles, más reciente y anterior ———
-  let añoActual=null, añoAnterior=null, ingActual=0, ingAnterior=0;
-  let mbActual=0, ebitdaActual=0, ebitActual=0, mbAnterior=0, ebitdaAnterior=0, ebitAnterior=0;
-  let gpActual=0, glActual=0, ggActual=0, amActual=0;
+  function tituloSeccion(txt, primera){
+    const base='font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;';
+    const espacio = primera ? 'margin:0 0 .7rem;' : 'margin:1.6rem 0 .7rem;padding-top:1.1rem;border-top:1px solid var(--border);';
+    return `<div style="${base}${espacio}">${txt}</div>`;
+  }
 
+  function badgeColor(valorNum, umbrales){
+    for(const u of umbrales){
+      if((u.min===undefined||valorNum>=u.min)&&(u.max===undefined||valorNum<u.max)) return u.cls;
+    }
+    return 'rb-blue';
+  }
+  function badgeSpan(texto, cls){
+    return `<span class="ratio-badge ${cls}" style="margin-left:7px;">${texto}</span>`;
+  }
+
+  // Diferencia en puntos (para magnitudes que ya son porcentajes, p.ej. un margen): evita confundir
+  // "puntos" con "% de variación relativa".
+  function variacionPuntos(actual, anterior, añoRef, mismoPeriodo){
+    if(añoRef==null || anterior==null) return '';
+    const diff = actual-anterior;
+    const verbo = diff>=0 ? 'más' : 'menos';
+    const refTxt = mismoPeriodo ? `el mismo periodo de ${añoRef}` : añoRef;
+    return ` (<strong>${Math.abs(diff).toFixed(1)} puntos ${verbo}</strong> que en ${refTxt})`;
+  }
+
+  function fmtPrecio(n){
+    if(n==null || !isFinite(n)) return '—';
+    return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/kg';
+  }
+
+  let bloqueFin = '';
+
+  // ===================== FINANCIERO (respeta los filtros del módulo Financiero) =====================
   if(tieneFin){
-    const añosFin=[...new Set(finData.map(r=>r.año))].sort((a,b)=>b-a);
-    añoActual = añosFin[0];
-    añoAnterior = añosFin[1] || null;
+    let finD = finData.filter(r=>
+      (selectedYearsFin.size===0 || selectedYearsFin.has(r.año)) &&
+      (selectedMonthsFin.size===0 || selectedMonthsFin.has(r.mes))
+    );
+    if(!finD.length) finD = finData;
 
-    function calcAño(año){
-      const rows = finData.filter(r=>r.año===año);
+    // Año más actual dentro de la selección de filtros del módulo financiero
+    const añosFin=[...new Set(finD.map(r=>r.año))].sort((a,b)=>b-a);
+    const añoActual = añosFin[0];
+    const añoAnterior = añosFin[1] || null;
+
+    // mesesFiltro: si se indica, restringe la agregación a ese conjunto de meses (para alinear años)
+    function calcAño(año, mesesFiltro){
+      const rows = finD.filter(r=>r.año===año && (!mesesFiltro || mesesFiltro.has(r.mes)));
+      const meses=[...new Set(rows.map(r=>r.mes))].sort((a,b)=>a-b);
       const ing=rows.reduce((a,r)=>a+(r.ingresos||0),0);
       const cm=rows.reduce((a,r)=>a+(r.coste_mercancia||0),0);
       const gp=rows.reduce((a,r)=>a+(r.gastos_personal||0),0);
@@ -786,61 +805,81 @@ function renderInforme(){
       const gg=rows.reduce((a,r)=>a+(r.gastos_generales||0),0);
       const am=rows.reduce((a,r)=>a+(r.amortizacion||0),0);
       const mb=ing-cm, ebitda=mb-gp-gl-gg, ebit=ebitda-am;
-      return {ing,cm,gp,gl,gg,am,mb,ebitda,ebit};
+      const last = rows.reduce((acc,r)=> (acc===null || r.mes>acc.mes) ? r : acc, null) || {};
+      return {ing,cm,gp,gl,gg,am,mb,ebitda,ebit,meses,nMeses:meses.length,rows,last};
     }
 
-    const datosActual=calcAño(añoActual);
-    ingActual=datosActual.ing; mbActual=datosActual.mb; ebitdaActual=datosActual.ebitda; ebitActual=datosActual.ebit;
-    gpActual=datosActual.gp; glActual=datosActual.gl; ggActual=datosActual.gg; amActual=datosActual.am;
+    const dA = calcAño(añoActual);
 
-    if(añoAnterior!=null){
-      const datosAnterior=calcAño(añoAnterior);
-      ingAnterior=datosAnterior.ing; mbAnterior=datosAnterior.mb; ebitdaAnterior=datosAnterior.ebitda; ebitAnterior=datosAnterior.ebit;
+    // Comparativa YTD real: el año anterior se alinea exactamente a los mismos meses que tiene
+    // el año actual (p.ej. si 2026 solo tiene Ene-Mar, se compara contra Ene-Mar de 2025, no contra
+    // el año 2025 completo ni contra una media mensual).
+    let dP = null, mismoPeriodo = false;
+    if(añoAnterior!=null && dA.nMeses>0){
+      const candidato = calcAño(añoAnterior, new Set(dA.meses));
+      if(candidato.nMeses === dA.nMeses){
+        dP = candidato;
+        mismoPeriodo = dA.nMeses < 12;
+      }
     }
 
-    // 1. Ventas del año
-    puntos.push(`En <strong>${añoActual}</strong>, la facturación alcanzó <strong>${fmtE(ingActual)}</strong>${variacionTxt(ingActual,ingAnterior,añoAnterior)}.`);
+    const periodoLabel = dA.nMeses===12 ? 'año completo'
+      : `${dA.nMeses} ${dA.nMeses===1?'mes':'meses'} con datos: ${dA.meses.map(m=>MESES[m]).join(', ')}`;
+    const notaComparacion = mismoPeriodo ? ` · comparado con el mismo periodo de ${añoAnterior}` : '';
 
-    // 2. Coste de mercancía vs año anterior
-    if(añoAnterior!=null){
-      const cmAnterior=calcAño(añoAnterior).cm;
-      puntos.push(`El coste de mercancía fue de <strong>${fmtE(datosActual.cm)}</strong>${variacionTxt(datosActual.cm,cmAnterior,añoAnterior)}.`);
-    } else {
-      puntos.push(`El coste de mercancía fue de <strong>${fmtE(datosActual.cm)}</strong>.`);
-    }
+    const puntosFin = [];
+
+    // 1. Ventas del periodo (YTD si el año está incompleto)
+    puntosFin.push(`La facturación de <strong>${añoActual}</strong> alcanzó <strong>${fmtE(dA.ing)}</strong>${variacionTxt(dA.ing,dP?.ing,añoAnterior,false,mismoPeriodo)}.`);
+
+    // 2. Coste de mercancía
+    const pctCM = dA.ing ? (dA.cm/dA.ing*100).toFixed(1) : '—';
+    puntosFin.push(`El coste de la mercancía vendida fue de <strong>${fmtE(dA.cm)}</strong> (<strong>${pctCM}%</strong> sobre ventas${variacionTxt(dA.cm,dP?.cm,añoAnterior,true,mismoPeriodo)}).`);
 
     // 3. Margen bruto
-    const pctMB = ingActual ? (mbActual/ingActual*100).toFixed(1) : '—';
-    puntos.push(`El margen bruto fue de <strong>${fmtE(mbActual)}</strong> (<strong>${pctMB}%</strong> sobre ventas${variacionTxt(mbActual,mbAnterior,añoAnterior,true)}).`);
+    const pctMB = dA.ing ? (dA.mb/dA.ing*100).toFixed(1) : '—';
+    puntosFin.push(`El margen bruto fue de <strong>${fmtE(dA.mb)}</strong> (<strong>${pctMB}%</strong> sobre ventas${variacionTxt(dA.mb,dP?.mb,añoAnterior,true,mismoPeriodo)}).`);
 
-    // 4. EBITDA y su evolución
-    const pctEBITDA = ingActual ? (ebitdaActual/ingActual*100).toFixed(1) : '—';
-    puntos.push(`El EBITDA se situó en <strong>${fmtE(ebitdaActual)}</strong> (<strong>${pctEBITDA}%</strong> sobre ventas${variacionTxt(ebitdaActual,ebitdaAnterior,añoAnterior,true)}).`);
+    // 4. EBITDA
+    const pctEBITDA = dA.ing ? (dA.ebitda/dA.ing*100).toFixed(1) : '—';
+    puntosFin.push(`El EBITDA se situó en <strong>${fmtE(dA.ebitda)}</strong> (<strong>${pctEBITDA}%</strong> sobre ventas${variacionTxt(dA.ebitda,dP?.ebitda,añoAnterior,true,mismoPeriodo)}).`);
 
     // 5. Resultado neto (EBIT)
-    const pctEBIT = ingActual ? (ebitActual/ingActual*100).toFixed(1) : '—';
-    puntos.push(`El resultado neto (EBIT) fue de <strong>${fmtE(ebitActual)}</strong> (<strong>${pctEBIT}%</strong> sobre ventas${variacionTxt(ebitActual,ebitAnterior,añoAnterior,true)})${ebitActual>=0?', con resultado positivo':', en negativo'}.`);
+    const pctEBIT = dA.ing ? (dA.ebit/dA.ing*100).toFixed(1) : '—';
+    puntosFin.push(`El resultado neto (EBIT) fue de <strong>${fmtE(dA.ebit)}</strong> (<strong>${pctEBIT}%</strong> sobre ventas${variacionTxt(dA.ebit,dP?.ebit,añoAnterior,true,mismoPeriodo)})${dA.ebit>=0?', con resultado positivo':', en negativo'}.`);
 
-    // 6. Principal partida de gasto operativo (excluyendo coste de mercancía, que ya se refleja en el margen bruto)
+    // 6. Apalancamiento operativo: ¿crecen más los ingresos o los gastos operativos? (mismo periodo en ambos años)
+    if(dP){
+      const gastosOpActual = Math.abs(dA.gp)+Math.abs(dA.gl)+Math.abs(dA.gg)+Math.abs(dA.am);
+      const gastosOpAnterior = Math.abs(dP.gp)+Math.abs(dP.gl)+Math.abs(dP.gg)+Math.abs(dP.am);
+      if(gastosOpAnterior>0 && dP.ing>0){
+        const varIng = (dA.ing-dP.ing)/Math.abs(dP.ing)*100;
+        const varGasto = (gastosOpActual-gastosOpAnterior)/Math.abs(gastosOpAnterior)*100;
+        const mejora = varIng > varGasto;
+        const refPeriodo = mismoPeriodo ? `respecto al mismo periodo de ${añoAnterior}` : `respecto a ${añoAnterior}`;
+        puntosFin.push(`Los ingresos ${varIng>=0?'crecieron':'cayeron'} un <strong>${Math.abs(varIng).toFixed(1)}%</strong> frente a una ${varGasto>=0?'subida':'bajada'} del <strong>${Math.abs(varGasto).toFixed(1)}%</strong> en el conjunto de gastos operativos (personal, logística, generales y amortización) ${refPeriodo}, lo que indica ${mejora?'una mejora del apalancamiento operativo':'una pérdida de eficiencia, ya que los costes crecen por encima de los ingresos'}.`);
+      }
+    }
+
+    // 7. Principal partida de gasto operativo (excluyendo coste de mercancía, ya reflejado en el margen bruto)
     const gastosOperativos=[
-      {nombre:'Personal', val:Math.abs(gpActual)},
-      {nombre:'Gastos generales', val:Math.abs(ggActual)},
-      {nombre:'Logística y transporte', val:Math.abs(glActual)},
-      {nombre:'Amortización', val:Math.abs(amActual)}
+      {nombre:'Personal', val:Math.abs(dA.gp)},
+      {nombre:'Gastos generales', val:Math.abs(dA.gg)},
+      {nombre:'Logística y transporte', val:Math.abs(dA.gl)},
+      {nombre:'Amortización', val:Math.abs(dA.am)}
     ].sort((a,b)=>b.val-a.val);
     const principalGasto=gastosOperativos[0];
-    const pctPrincipal = ingActual ? (principalGasto.val/ingActual*100).toFixed(1) : '—';
+    const pctPrincipal = dA.ing ? (principalGasto.val/dA.ing*100).toFixed(1) : '—';
     let valGastoAnterior=null;
-    if(añoAnterior!=null){
-      const datosAnt=calcAño(añoAnterior);
-      const mapaAnterior={'Personal':Math.abs(datosAnt.gp),'Gastos generales':Math.abs(datosAnt.gg),'Logística y transporte':Math.abs(datosAnt.gl),'Amortización':Math.abs(datosAnt.am)};
+    if(dP){
+      const mapaAnterior={'Personal':Math.abs(dP.gp),'Gastos generales':Math.abs(dP.gg),'Logística y transporte':Math.abs(dP.gl),'Amortización':Math.abs(dP.am)};
       valGastoAnterior=mapaAnterior[principalGasto.nombre];
     }
-    puntos.push(`La principal partida de gasto operativo es <strong>${principalGasto.nombre}</strong>, con <strong>${fmtE(principalGasto.val)}</strong> (<strong>${pctPrincipal}%</strong> de las ventas${variacionTxt(principalGasto.val,valGastoAnterior,añoAnterior,true)}).`);
+    puntosFin.push(`La principal partida de gasto operativo es <strong>${principalGasto.nombre}</strong>, con <strong>${fmtE(principalGasto.val)}</strong> (<strong>${pctPrincipal}%</strong> de las ventas${variacionTxt(principalGasto.val,valGastoAnterior,añoAnterior,true,mismoPeriodo)}).`);
 
-    // 7. Cuenta individual con mayor gasto (combustible, electricidad, etc.) si hay detalle
+    // 8. Cuenta individual con mayor gasto dentro de gastos generales
     const ggCuentasTotal={};
-    finData.filter(r=>r.año===añoActual).forEach(r=>{
+    dA.rows.forEach(r=>{
       if(r.gg_cuentas) Object.entries(r.gg_cuentas).forEach(([k,v])=>{
         const desc=k.split('|||')[1];
         ggCuentasTotal[desc]=(ggCuentasTotal[desc]||0)+v;
@@ -849,9 +888,9 @@ function renderInforme(){
     const topCuenta=Object.entries(ggCuentasTotal).sort((a,b)=>b[1]-a[1])[0];
     if(topCuenta){
       let valCuentaAnterior=null;
-      if(añoAnterior!=null){
+      if(dP){
         const ggCuentasTotalAnt={};
-        finData.filter(r=>r.año===añoAnterior).forEach(r=>{
+        dP.rows.forEach(r=>{
           if(r.gg_cuentas) Object.entries(r.gg_cuentas).forEach(([k,v])=>{
             const desc=k.split('|||')[1];
             if(desc===topCuenta[0]) ggCuentasTotalAnt[desc]=(ggCuentasTotalAnt[desc]||0)+v;
@@ -859,16 +898,80 @@ function renderInforme(){
         });
         valCuentaAnterior=ggCuentasTotalAnt[topCuenta[0]];
       }
-      puntos.push(`Dentro de los gastos generales, la cuenta con mayor importe es <strong>${topCuenta[0]}</strong>, con <strong>${fmtE(topCuenta[1])}</strong>${variacionTxt(topCuenta[1],valCuentaAnterior,añoAnterior)}.`);
+      puntosFin.push(`Dentro de los gastos generales, la cuenta con mayor importe es <strong>${topCuenta[0]}</strong>, con <strong>${fmtE(topCuenta[1])}</strong>${variacionTxt(topCuenta[1],valCuentaAnterior,añoAnterior,false,mismoPeriodo)}.`);
     }
+
+    // 9. Tendencia multi-año del margen EBITDA (alineada a los mismos meses que el año actual,
+    // para que todos los años sean comparables entre sí)
+    if(añosFin.length>=3 && dA.nMeses>0){
+      const margenes = añosFin.slice().reverse().map(a=>{
+        const dd=calcAño(a, new Set(dA.meses));
+        return (dd.nMeses===dA.nMeses && dd.ing) ? {año:a, margen:(dd.ebitda/dd.ing*100)} : null;
+      }).filter(Boolean);
+      if(margenes.length>=3){
+        const primero=margenes[0], ultimo=margenes[margenes.length-1];
+        const mejora = ultimo.margen - primero.margen;
+        puntosFin.push(`En los últimos <strong>${margenes.length} años</strong> con datos comparables (${primero.año}–${ultimo.año}), el margen EBITDA ha ${mejora>=0?'mejorado':'empeorado'} en <strong>${Math.abs(mejora).toFixed(1)} puntos</strong> (del ${primero.margen.toFixed(1)}% al ${ultimo.margen.toFixed(1)}%).`);
+      }
+    }
+
+    // ——— Liquidez y solvencia, con el balance del último mes disponible del periodo filtrado ———
+    const lr = dA.last||{};
+    const ac=lr.activos_circulante||0, af=lr.activos_fijos||0, pc=lr.pasivo_corriente||0,
+          pnc=lr.pasivo_no_corriente||0, pn=lr.patrimonio_neto||0;
+    const hayBalance = ac>0 || af>0 || pc>0 || pnc>0 || pn!==0;
+    const puntosBalance=[];
+    if(hayBalance){
+      if(pc>0){
+        const liquidez = ac/pc;
+        const cls = badgeColor(liquidez,[{min:1.5,cls:'rb-green'},{min:1,max:1.5,cls:'rb-amber'},{max:1,cls:'rb-red'}]);
+        const calif = cls==='rb-green'?'sólida':cls==='rb-amber'?'ajustada':'tensionada';
+        puntosBalance.push(`La liquidez es ${calif}: el activo circulante cubre el pasivo corriente con un ratio de <strong>${liquidez.toFixed(2)}</strong>${badgeSpan(liquidez.toFixed(2),cls)}.`);
+      }
+      const pt=pc+pnc;
+      if(pn>0 && pt>=0){
+        const endeudamiento = pt/pn;
+        const cls = badgeColor(endeudamiento,[{max:0.5,cls:'rb-green'},{min:0.5,max:1,cls:'rb-amber'},{min:1,cls:'rb-red'}]);
+        const calif = cls==='rb-green'?'bajo':cls==='rb-amber'?'moderado':'elevado';
+        puntosBalance.push(`El nivel de endeudamiento es ${calif}: el pasivo total equivale a <strong>${endeudamiento.toFixed(2)}×</strong> el patrimonio neto${badgeSpan(endeudamiento.toFixed(2)+'x',cls)}.`);
+      } else if(pn<=0){
+        puntosBalance.push(`El patrimonio neto es negativo (<strong>${fmtE(pn)}</strong>), lo que refleja fondos propios negativos y un riesgo elevado de insolvencia patrimonial.`);
+      }
+    }
+
+    bloqueFin = `
+      ${tituloSeccion('📊 Resultados financieros · '+añoActual+' ('+periodoLabel+')'+notaComparacion, true)}
+      <ol style="padding-left:1.3rem;margin:0;">${puntosFin.map(p=>`<li style="margin-bottom:0.7rem;">${p}</li>`).join('')}</ol>
+      ${puntosBalance.length ? tituloSeccion('🏦 Liquidez y solvencia') + `<ul style="padding-left:1.3rem;margin:0;">${puntosBalance.map(p=>`<li style="margin-bottom:0.7rem;">${p}</li>`).join('')}</ul>` : ''}
+    `;
   }
 
-  // ——— Datos operacionales ———
+  // ===================== OPERACIONAL (respeta los filtros del módulo Operacional) =====================
+  let bloqueOp = '';
   if(tieneOp){
-    const añosOp=[...new Set(opData.map(r=>r.año))].sort((a,b)=>b-a);
+    let opD = opData.filter(r=>
+      (selectedYears.size===0 || selectedYears.has(r.año)) &&
+      (selectedMonths.size===0 || selectedMonths.has(r.mes))
+    );
+    if(!opD.length) opD = opData;
+
+    const añosOp=[...new Set(opD.map(r=>r.año))].sort((a,b)=>b-a);
     const añoOpActual=añosOp[0];
     const añoOpAnterior=añosOp[1]||null;
-    const rowsOpActual=opData.filter(r=>r.año===añoOpActual);
+    const rowsOpActual=opD.filter(r=>r.año===añoOpActual);
+    const mesesOpActual=[...new Set(rowsOpActual.map(r=>r.mes))].sort((a,b)=>a-b);
+    const mesesOpActualSet=new Set(mesesOpActual);
+
+    // Alinear el año anterior a los mismos meses que el año actual (comparación YTD real)
+    let rowsOpAnterior=null, mismoPeriodoOp=false;
+    if(añoOpAnterior!=null){
+      const candidato = opD.filter(r=>r.año===añoOpAnterior && mesesOpActualSet.has(r.mes));
+      if(new Set(candidato.map(r=>r.mes)).size === mesesOpActual.length){
+        rowsOpAnterior = candidato;
+        mismoPeriodoOp = mesesOpActual.length < 12;
+      }
+    }
+
     const kc=rowsOpActual.reduce((a,r)=>a+r.kg_compra,0);
     const kv=rowsOpActual.reduce((a,r)=>a+r.kg_venta,0);
     const iv=rowsOpActual.reduce((a,r)=>a+r.importe_venta,0);
@@ -876,9 +979,8 @@ function renderInforme(){
     const margenOp = iv>0 ? ((iv-ic)/iv*100).toFixed(1) : '—';
     const rendimiento = kc>0 ? (kv/kc*100).toFixed(1) : '—';
 
-    let kcAnterior=null, kvAnterior=null, margenOpAnteriorNum=null, valTopProductoAnterior=null;
-    if(añoOpAnterior!=null){
-      const rowsOpAnterior=opData.filter(r=>r.año===añoOpAnterior);
+    let kcAnterior=null, kvAnterior=null, margenOpAnteriorNum=null;
+    if(rowsOpAnterior){
       kcAnterior=rowsOpAnterior.reduce((a,r)=>a+r.kg_compra,0);
       kvAnterior=rowsOpAnterior.reduce((a,r)=>a+r.kg_venta,0);
       const ivAnt=rowsOpAnterior.reduce((a,r)=>a+r.importe_venta,0);
@@ -886,44 +988,81 @@ function renderInforme(){
       margenOpAnteriorNum = ivAnt>0 ? ((ivAnt-icAnt)/ivAnt*100) : null;
     }
 
-    // 8. Volumen operado
-    puntos.push(`En el plano operativo, en ${añoOpActual} se compraron <strong>${fmt(kc)} kg</strong>${variacionTxt(kc,kcAnterior,añoOpAnterior)} y se vendieron <strong>${fmt(kv)} kg</strong>${variacionTxt(kv,kvAnterior,añoOpAnterior)} (rendimiento del <strong>${rendimiento}%</strong>).`);
+    const puntosOp = [];
 
-    // 9. Margen operativo y producto principal
+    // Volumen operado (YTD real si el año está incompleto)
+    puntosOp.push(`En ${añoOpActual} se compraron <strong>${fmt(kc)} kg</strong>${variacionTxt(kc,kcAnterior,añoOpAnterior,false,mismoPeriodoOp)} y se vendieron <strong>${fmt(kv)} kg</strong>${variacionTxt(kv,kvAnterior,añoOpAnterior,false,mismoPeriodoOp)} (rendimiento del <strong>${rendimiento}%</strong>).`);
+
+    // Margen operativo global
+    const margenOpVarTxt = margenOpAnteriorNum!=null ? variacionTxt(parseFloat(margenOp),margenOpAnteriorNum,añoOpAnterior,false,mismoPeriodoOp) : '';
+    puntosOp.push(`El margen bruto operativo (venta vs. compra) fue del <strong>${margenOp}%</strong>${margenOpVarTxt}.`);
+
+    // Fruta/verdura más vendida hasta el momento: volumen, margen y precio medio de compra/venta
     const pgVenta={};
     rowsOpActual.forEach(r=>{ pgVenta[r.clasificacion]=(pgVenta[r.clasificacion]||0)+r.kg_venta; });
     const topProducto=Object.entries(pgVenta).sort((a,b)=>b[1]-a[1])[0];
-    if(topProducto && añoOpAnterior!=null){
-      const pgVentaAnt={};
-      opData.filter(r=>r.año===añoOpAnterior && r.clasificacion===topProducto[0]).forEach(r=>{ pgVentaAnt[r.clasificacion]=(pgVentaAnt[r.clasificacion]||0)+r.kg_venta; });
-      valTopProductoAnterior=pgVentaAnt[topProducto[0]];
-    }
-    const margenOpVarTxt = margenOpAnteriorNum!=null ? variacionTxt(parseFloat(margenOp),margenOpAnteriorNum,añoOpAnterior) : '';
-    puntos.push(`El margen bruto operativo (venta vs. compra) fue del <strong>${margenOp}%</strong>${margenOpVarTxt}${topProducto?`, siendo <strong>${topProducto[0]}</strong> el producto con mayor volumen comercializado (${fmt(topProducto[1])} kg${variacionTxt(topProducto[1],valTopProductoAnterior,añoOpAnterior,true)})`:''}.`);
+    if(topProducto){
+      const nombreTop = topProducto[0];
+      const rowsTop = rowsOpActual.filter(r=>r.clasificacion===nombreTop);
+      const kgCompraTop = rowsTop.reduce((a,r)=>a+r.kg_compra,0);
+      const kgVentaTop = rowsTop.reduce((a,r)=>a+r.kg_venta,0);
+      const impCompraTop = rowsTop.reduce((a,r)=>a+r.importe_compra,0);
+      const impVentaTop = rowsTop.reduce((a,r)=>a+r.importe_venta,0);
+      const precioCompraTop = kgCompraTop>0 ? impCompraTop/kgCompraTop : null;
+      const precioVentaTop = kgVentaTop>0 ? impVentaTop/kgVentaTop : null;
+      const margenTop = impVentaTop>0 ? (impVentaTop-impCompraTop)/impVentaTop*100 : null;
 
-    // 10. Coste de gasoil si hay datos financieros disponibles también
+      let kgVentaTopAnt=null, precioCompraTopAnt=null, precioVentaTopAnt=null, margenTopAnt=null;
+      if(rowsOpAnterior){
+        const rowsTopAnt = rowsOpAnterior.filter(r=>r.clasificacion===nombreTop);
+        const kgCompraTopAnt = rowsTopAnt.reduce((a,r)=>a+r.kg_compra,0);
+        kgVentaTopAnt = rowsTopAnt.reduce((a,r)=>a+r.kg_venta,0);
+        const impCompraTopAnt = rowsTopAnt.reduce((a,r)=>a+r.importe_compra,0);
+        const impVentaTopAnt = rowsTopAnt.reduce((a,r)=>a+r.importe_venta,0);
+        precioCompraTopAnt = kgCompraTopAnt>0 ? impCompraTopAnt/kgCompraTopAnt : null;
+        precioVentaTopAnt = kgVentaTopAnt>0 ? impVentaTopAnt/kgVentaTopAnt : null;
+        margenTopAnt = impVentaTopAnt>0 ? (impVentaTopAnt-impCompraTopAnt)/impVentaTopAnt*100 : null;
+      }
+
+      puntosOp.push(`La fruta o verdura más vendida hasta el momento es <strong>${nombreTop}</strong>, con <strong>${fmt(kgVentaTop)} kg</strong> comercializados${variacionTxt(kgVentaTop,kgVentaTopAnt,añoOpAnterior,false,mismoPeriodoOp)}. Su margen bruto es del <strong>${margenTop!=null?margenTop.toFixed(1)+'%':'—'}</strong>${margenTop!=null?variacionPuntos(margenTop,margenTopAnt,añoOpAnterior,mismoPeriodoOp):''}, con un precio medio de compra de <strong>${fmtPrecio(precioCompraTop)}</strong>${precioCompraTop!=null?variacionTxt(precioCompraTop,precioCompraTopAnt,añoOpAnterior,false,mismoPeriodoOp):''} y un precio medio de venta de <strong>${fmtPrecio(precioVentaTop)}</strong>${precioVentaTop!=null?variacionTxt(precioVentaTop,precioVentaTopAnt,añoOpAnterior,false,mismoPeriodoOp):''}.`);
+    }
+
+    // Coste de combustible, usando los mismos filtros del módulo financiero, alineado a los mismos meses
     if(tieneFin){
-      const rowsFinActual=finData.filter(r=>r.año===añoOpActual);
+      let finDparaOp = finData.filter(r=>
+        (selectedYearsFin.size===0 || selectedYearsFin.has(r.año)) &&
+        (selectedMonthsFin.size===0 || selectedMonthsFin.has(r.mes))
+      );
+      if(!finDparaOp.length) finDparaOp = finData;
+      const rowsFinActual=finDparaOp.filter(r=>r.año===añoOpActual);
+      const mesesFinActualSet = new Set(rowsFinActual.map(r=>r.mes));
       const costeCombustible=rowsFinActual.reduce((a,r)=>a+(r.coste_combustible||0),0);
       if(costeCombustible>0 && kc>0){
         const gasoilKg=(costeCombustible/kc).toFixed(4);
-        let costeCombustibleAnterior=null;
+        let costeCombustibleAnterior=null, mismoPeriodoComb=false;
         if(añoOpAnterior!=null){
-          costeCombustibleAnterior=finData.filter(r=>r.año===añoOpAnterior).reduce((a,r)=>a+(r.coste_combustible||0),0);
+          const candidatoFin = finDparaOp.filter(r=>r.año===añoOpAnterior && mesesFinActualSet.has(r.mes));
+          if(new Set(candidatoFin.map(r=>r.mes)).size === mesesFinActualSet.size){
+            costeCombustibleAnterior = candidatoFin.reduce((a,r)=>a+(r.coste_combustible||0),0);
+            mismoPeriodoComb = mesesFinActualSet.size<12;
+          }
         }
-        puntos.push(`El coste de combustible asociado al transporte fue de <strong>${fmtE(costeCombustible)}</strong>${variacionTxt(costeCombustible,costeCombustibleAnterior,añoOpAnterior)}, equivalente a <strong>${gasoilKg} €/kg</strong> comprado.`);
+        puntosOp.push(`El coste de combustible asociado al transporte fue de <strong>${fmtE(costeCombustible)}</strong>${variacionTxt(costeCombustible,costeCombustibleAnterior,añoOpAnterior,false,mismoPeriodoComb)}, equivalente a <strong>${gasoilKg} €/kg</strong> comprado.`);
       }
     }
+
+    bloqueOp = `
+      ${tituloSeccion('📦 Actividad operativa · '+añoOpActual, !tieneFin)}
+      <ol style="padding-left:1.3rem;margin:0;">${puntosOp.map(p=>`<li style="margin-bottom:0.7rem;">${p}</li>`).join('')}</ol>
+    `;
   }
 
-  // Si por algún motivo hay menos de 10 puntos, no pasa nada, se muestran los disponibles
   el.innerHTML = `
     <p style="color:var(--text-light); margin-bottom:1rem; font-size:13px;">
-      Resumen generado automáticamente a partir de los datos cargados en los módulos Operacional y Financiero.
+      Resumen generado automáticamente a partir de los datos cargados, respetando los filtros de año y mes activos en los módulos Operacional y Financiero.
     </p>
-    <ol style="padding-left:1.3rem; margin:0;">
-      ${puntos.map(p=>`<li style="margin-bottom:0.7rem;">${p}</li>`).join('')}
-    </ol>
+    ${bloqueFin}
+    ${bloqueOp}
   `;
 }
 
@@ -1019,7 +1158,64 @@ function selectAllYears(all){
   renderOp();
 }
 
-// ——— CLASIFICACIÓN (multi-select) ———
+// ——— BÚSQUEDA RÁPIDA DE FRUTA/VERDURA (selecciona una sola directamente) ———
+function onQuickSearchInput(scope, valor){
+  const resultsEl = document.getElementById('quick-search-results-'+scope);
+  const term = valor.trim().toLowerCase();
+
+  const gridId = scope==='op' ? 'clasificacion-grid' : null;
+  if(!gridId){ resultsEl.classList.remove('open'); return; }
+
+  const todasLasOpciones = [...document.querySelectorAll('#'+gridId+' input')].map(el=>el.value);
+  if(!term){
+    resultsEl.classList.remove('open');
+    resultsEl.innerHTML='';
+    return;
+  }
+
+  const coincidencias = todasLasOpciones.filter(op=>op.toLowerCase().includes(term)).slice(0,15);
+
+  if(coincidencias.length===0){
+    resultsEl.innerHTML = `<div class="quick-search-no-results">Sin coincidencias</div>`;
+  } else {
+    // kg vendidos por opción, para mostrar de referencia junto al nombre
+    const kgPorOpcion={};
+    opData.forEach(r=>{ if(coincidencias.includes(r.clasificacion)) kgPorOpcion[r.clasificacion]=(kgPorOpcion[r.clasificacion]||0)+r.kg_venta; });
+
+    resultsEl.innerHTML = coincidencias.map(op=>`
+      <div class="quick-search-result-item" onclick="seleccionarUnaClasifQuick('${op.replace(/'/g,"\\'")}')">
+        <span>${op}</span>
+        <span class="qsr-kg">${fmt(kgPorOpcion[op]||0)} kg</span>
+      </div>
+    `).join('') + `<div class="quick-search-clear-row"><button onclick="limpiarQuickSearch('op')">✕ Limpiar selección y ver todas</button></div>`;
+  }
+  resultsEl.classList.add('open');
+}
+
+function seleccionarUnaClasifQuick(nombre){
+  document.querySelectorAll('#clasificacion-grid input').forEach(el=>{
+    el.checked = (el.value===nombre);
+  });
+  onClasifChange();
+  document.getElementById('quick-search-op').value = nombre;
+  document.getElementById('quick-search-results-op').classList.remove('open');
+  // Abrir el panel de filtros para que se vea reflejada la selección
+  const panel=document.getElementById('filters-panel-op');
+  if(panel && !panel.classList.contains('open')) toggleFiltersPanel('op');
+}
+
+function limpiarQuickSearch(scope){
+  if(scope==='op') selectAllClasif(true);
+  document.getElementById('quick-search-'+scope).value='';
+  document.getElementById('quick-search-results-'+scope).classList.remove('open');
+}
+
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.quick-search-wrap')){
+    document.querySelectorAll('.quick-search-results').forEach(el=>el.classList.remove('open'));
+  }
+});
+
 let selectedClasificaciones = new Set(['todos']); // 'todos' = sin filtrar
 
 function initClasifGrid(clasifs){
@@ -1383,25 +1579,41 @@ function renderOp(){
   renderImporteChart('compra', clasif, desc);
   renderImporteChart('venta', clasif, desc);
 
-  // Distribución por clasificación (o por descripción si hay una sola clasificación elegida)
+  // Distribución por clasificación (o por descripción si hay una sola clasificación elegida) — un gráfico por año
   const totalClasif = document.querySelectorAll('#clasificacion-grid input').length;
   const usarDescripcion = clasif.size===1 && totalClasif>1;
   const clasifNombre = usarDescripcion ? [...clasif][0] : '';
-  document.getElementById('title-chartProducto').textContent =
-    usarDescripcion ? `Distribución por variedad de ${clasifNombre} (kg vendidos)` : 'Distribución por fruta/verdura (kg vendidos)';
-  const pg={};
-  d.forEach(r=>{
-    const key = usarDescripcion ? r.descripcion : r.clasificacion;
-    pg[key]=(pg[key]||0)+r.kg_venta;
-  });
-  const prodLabelsFull=Object.entries(pg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  setTituloCard('title-chartProducto',
+    usarDescripcion ? `Distribución por variedad de ${clasifNombre} (kg vendidos)` : 'Distribución por fruta/verdura (kg vendidos)');
+
+  const añosProductoCols = añosOrdenados.length>0 ? añosOrdenados : ['—'];
+  const wrapProducto = document.getElementById('chartProducto-wrap');
+  wrapProducto.innerHTML = añosProductoCols.map(año=>`
+    <div class="chart-producto-item">
+      <div class="chart-producto-item-title">${año==='—' ? 'Todos los periodos' : año}</div>
+      <div class="chart-producto-item-canvas-wrap"><canvas id="chartProducto-${año}"></canvas></div>
+    </div>
+  `).join('');
+
   const TOP=10;
-  const prodLabels=prodLabelsFull.slice(0,TOP).map(([k])=>k);
-  const prodValues=prodLabelsFull.slice(0,TOP).map(([,v])=>v);
-  destroyC('chartProducto');
-  charts['chartProducto']=new Chart(document.getElementById('chartProducto'),{
-    type:'doughnut',data:{labels:prodLabels,datasets:[{data:prodValues,backgroundColor:C_PROD,borderWidth:1}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}}}}
+  añosProductoCols.forEach(año=>{
+    const rowsAño = año==='—' ? d : d.filter(r=>r.año===año);
+    const pg={};
+    rowsAño.forEach(r=>{
+      const key = usarDescripcion ? r.descripcion : r.clasificacion;
+      pg[key]=(pg[key]||0)+r.kg_venta;
+    });
+    const prodLabelsFull=Object.entries(pg).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    const prodLabels=prodLabelsFull.slice(0,TOP).map(([k])=>k);
+    const prodValues=prodLabelsFull.slice(0,TOP).map(([,v])=>v);
+    const chartKey='chartProducto-'+año;
+    destroyC(chartKey);
+    const canvasEl=document.getElementById('chartProducto-'+año);
+    if(!canvasEl) return;
+    charts[chartKey]=new Chart(canvasEl,{
+      type:'doughnut',data:{labels:prodLabels,datasets:[{data:prodValues,backgroundColor:C_PROD,borderWidth:1}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}}}}
+    });
   });
 
   // Precio medio COMPRA y VENTA: por clasificación, o por variedad si solo hay 1 clasificación seleccionada
@@ -1414,9 +1626,9 @@ function renderOp(){
   _precioVentaAllLabels = allClasifLabels;
 
   // Título dinámico según si mostramos clasificación o variedad
-  document.getElementById('title-chartPrecio').textContent = usarDescripcion
+  setTituloCard('title-chartPrecio', usarDescripcion
     ? `Precio medio por variedad de ${clasifNombre} (€/kg)`
-    : 'Precio medio por fruta/verdura (€/kg)';
+    : 'Precio medio por fruta/verdura (€/kg)');
 
   // Años seleccionados en el filtro
   _precioYears = [...selectedYears].sort((a,b)=>a-b);
@@ -1624,6 +1836,25 @@ function renderFin(){
     return {orden, porAño};
   }
 
+  function calcDetalleIngresosPorAño(campoSubgrupos){
+    // Igual que calcDetallePorAño pero SIN invertir signo (los ingresos ya son positivos)
+    const acumTotal={}; const porAño={};
+    añosCols.forEach(año=>{
+      const rowsAño = año==='—' ? d : d.filter(r=>r.año===año);
+      rowsAño.forEach(r=>{
+        if(r[campoSubgrupos]){
+          Object.entries(r[campoSubgrupos]).forEach(([k,v])=>{
+            acumTotal[k]=(acumTotal[k]||0)+v;
+            if(!porAño[k]) porAño[k]={};
+            porAño[k][año]=(porAño[k][año]||0)+v;
+          });
+        }
+      });
+    });
+    const orden=Object.entries(acumTotal).filter(([,v])=>Math.abs(v)>0.5).sort((a,b)=>b[1]-a[1]).map(([k])=>k);
+    return {orden, porAño};
+  }
+
   const ingPorAño=calcLineaPorAño('ingresos',1);
   const cmPorAño=calcLineaPorAño('coste_mercancia',-1);
   const gpPorAño=calcLineaPorAño('gastos_personal',-1);
@@ -1670,6 +1901,7 @@ function renderFin(){
   const ggDet=calcDetallePorAño('gg_subgrupos');
   const ggCuentasDet=calcDetallePorAño('gg_cuentas'); // clave: "subgrupo|||desc"
   const glDet=calcDetallePorAño('gl_cuentas');
+  const ingDet=calcDetalleIngresosPorAño('ing_subgrupos');
 
   // ——— Top 4 cuentas con mayor gasto (combinando Gastos generales + Logística) ———
   const poolCuentas=[]; // {nombre, totalAbs, porAño}
@@ -1746,7 +1978,8 @@ function renderFin(){
   }
 
   const pnlRows=[
-    {label:'Ingresos por ventas',valores:ingPorAño,type:'pos',indent:false},
+    {label:'Ingresos por ventas',valores:ingPorAño,type:'pos',indent:false,
+      expandableSimple:ingDet.orden.length>0, detalleOrden:ingDet.orden, detallePorAño:ingDet.porAño},
     {sep:'Costes directos'},
     {label:'Coste de mercancía',valores:cmPorAño,type:'neg',indent:true},
     {label:'Margen bruto',valores:mbPorAño,type:'subtotal',indent:false},
@@ -2152,8 +2385,10 @@ function parseXLSX(buffer, isOp){
 // Clasificación de cuentas PGC -> línea P&L (basada en grupo de 3 dígitos)
 function clasificarCuentaPGC(cuentaStr){
   const c3=cuentaStr.slice(0,3);
-  if(['700','704','705'].includes(c3)) return {linea:'ingresos', signo:1};
-  if(['740','746','769','778','794','795'].includes(c3)) return {linea:'ingresos', signo:1};
+  if(c3==='700') return {linea:'ingresos', subgrupo:'Ventas comerciales', signo:1};
+  if(c3==='704') return {linea:'ingresos', subgrupo:'Venta envases y embalajes', signo:1};
+  if(c3==='705') return {linea:'ingresos', subgrupo:'Venta servicio (frío)', signo:1};
+  if(['740','746','769','778','794','795'].includes(c3)) return {linea:'ingresos', subgrupo:'Otros ingresos', signo:1};
   if(['600','601','602','607','610'].includes(c3)) return {linea:'coste_mercancia', signo:-1};
   if(['640','642','649'].includes(c3)) return {linea:'gastos_personal', signo:-1};
   if(c3==='624') return {linea:'gastos_logistica', signo:-1};
@@ -2194,7 +2429,7 @@ function parseExtractoContable(wb, wsName){
     if(!meses[key]) meses[key]={
       año, mes, ingresos:0, coste_mercancia:0, gastos_personal:0, gastos_logistica:0,
       gastos_generales:0, amortizacion:0, gastos_financieros:0,
-      gg_subgrupos:{}, gg_cuentas:{}, gl_cuentas:{}, coste_combustible:0
+      gg_subgrupos:{}, gg_cuentas:{}, gl_cuentas:{}, ing_subgrupos:{}, coste_combustible:0
     };
     return meses[key];
   }
@@ -2226,7 +2461,10 @@ function parseExtractoContable(wb, wsName){
     if(cls.linea==='sin_clasificar') return;
 
     const b=bucket(año,mes);
-    if(cls.linea==='ingresos') b.ingresos += importeSigned;
+    if(cls.linea==='ingresos'){
+      b.ingresos += importeSigned;
+      b.ing_subgrupos[cls.subgrupo] = (b.ing_subgrupos[cls.subgrupo]||0) + importeSigned;
+    }
     else if(cls.linea==='gastos_generales'){
       b.gastos_generales += -importeSigned;
       b.gg_subgrupos[cls.subgrupo] = (b.gg_subgrupos[cls.subgrupo]||0) + (-importeSigned);
@@ -2447,7 +2685,84 @@ function downloadTemplate(tipo){
   a.click();
 }
 
-// ——— INIT ———
+// ——— COLAPSAR / EXPANDIR CARDS ———
+function setTituloCard(id, texto){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const span = el.querySelector('span');
+  if(span){
+    span.textContent = texto; // preserva el botón de colapsar que va al lado
+  } else {
+    el.textContent = texto;
+  }
+}
+
+function initCardCollapse(){
+  const STORAGE_KEY = 'dashboard_cards_colapsadas';
+  let colapsadas;
+  try { colapsadas = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ colapsadas = {}; }
+
+  document.querySelectorAll('.card').forEach((card, idx)=>{
+    if(card.dataset.collapseInit==='1') return; // ya procesado, evitar doble envoltura
+    const title = card.querySelector('.card-title');
+    if(!title) return; // ratios-grid u otros cards sin título no se tocan
+    card.dataset.collapseInit='1';
+
+    // Identificador estable: el id del título si lo tiene, o un índice basado en su contenido
+    const cardId = title.id || ('card-'+idx+'-'+title.textContent.trim().substring(0,20).replace(/\s+/g,'_'));
+
+    // Mover todo el contenido del card (excepto el título y su fila de header si existe) a un wrapper colapsable
+    const headerRow = title.parentElement!==card ? title.parentElement : null; // caso "header flex" como Precio medio
+    const wrap = document.createElement('div');
+    wrap.className = 'card-collapsible-body';
+
+    const nodosAEnvolver = [];
+    [...card.childNodes].forEach(node=>{
+      if(node===headerRow) return; // no envolver la fila de header (título+botón existente)
+      if(node===title && !headerRow) return; // no envolver el título suelto
+      nodosAEnvolver.push(node);
+    });
+    nodosAEnvolver.forEach(node=>wrap.appendChild(node));
+    card.appendChild(wrap);
+
+    // Botón de colapsar/expandir
+    const btn = document.createElement('button');
+    btn.className = 'card-collapse-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-label','Mostrar u ocultar esta gráfica');
+    btn.innerHTML = '▾';
+
+    function aplicarEstado(colapsado){
+      wrap.style.display = colapsado ? 'none' : '';
+      btn.innerHTML = colapsado ? '▸' : '▾';
+      card.classList.toggle('card-collapsed', colapsado);
+    }
+
+    btn.addEventListener('click', ()=>{
+      const estaColapsado = wrap.style.display === 'none';
+      const nuevoEstado = !estaColapsado;
+      aplicarEstado(nuevoEstado);
+      colapsadas[cardId] = nuevoEstado;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(colapsadas)); } catch(e){}
+    });
+
+    if(headerRow){
+      headerRow.appendChild(btn);
+    } else {
+      title.style.display='flex'; title.style.alignItems='center'; title.style.justifyContent='space-between';
+      const span=document.createElement('span');
+      span.textContent=title.textContent;
+      title.textContent='';
+      title.appendChild(span);
+      title.appendChild(btn);
+    }
+
+    const estadoGuardado = colapsadas[cardId];
+    aplicarEstado(estadoGuardado===undefined ? true : !!estadoGuardado);
+  });
+}
+
 document.getElementById('header-date').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 opData=genOp(); finData=genFin();
@@ -2459,6 +2774,7 @@ populateOpFilters(); populateFinFilters();
 renderOp(); renderFin();
 autoLoadOpData();
 autoLoadFinData();
+initCardCollapse();
 </script>
 </body>
 </html>
