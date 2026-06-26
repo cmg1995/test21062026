@@ -2658,7 +2658,28 @@ function loadFinFile(e){
   reader.onload=ev=>{
     try{
       const rows=isXLSX?parseXLSX(ev.target.result,false):parseCSV(ev.target.result);
-      finData=rows.map(r=>({...r,mes:r.mes||0,año:r.año||2024}));
+      const nuevasFilas=rows.map(r=>({...r,mes:r.mes||0,año:r.año||2024}));
+
+      // Fusionar con finData existente por mes/año, conservando campos de balance ya cargados
+      // (activos_fijos, existencias, patrimonio_neto, etc.) que el extracto de P&L no incluye.
+      const finDataAnterior = finData;
+      nuevasFilas.forEach(filaNueva=>{
+        const filaPrevia = finDataAnterior.find(r=>r.mes===filaNueva.mes && r.año===filaNueva.año);
+        if(filaPrevia){
+          // Copiar al objeto nuevo cualquier campo de balance que la fila previa tuviera y el nuevo no defina
+          Object.keys(filaPrevia).forEach(campo=>{
+            if(filaNueva[campo]===undefined) filaNueva[campo]=filaPrevia[campo];
+          });
+        }
+      });
+      // Conservar filas previas (ej. balances de meses sin P&L, como diciembre del año anterior)
+      // que no tengan equivalente en el nuevo P&L cargado
+      finDataAnterior.forEach(filaPrevia=>{
+        const existeEnNuevas = nuevasFilas.some(r=>r.mes===filaPrevia.mes && r.año===filaPrevia.año);
+        if(!existeEnNuevas) nuevasFilas.push(filaPrevia);
+      });
+      finData = nuevasFilas;
+
       const msg=`${file.name} — ${finData.length} registros`;
       document.getElementById('fin-status').textContent='✓ '+msg+' — guardando para todos…';
       document.getElementById('upload-panel').classList.remove('open');
