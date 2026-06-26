@@ -2329,7 +2329,7 @@ function renderCashFlow(d){
 
   if(conBalance.length < 2){
     el.innerHTML = `<p style="color:var(--text-light); font-size:13.5px;">
-      Se necesitan al menos <strong>dos balances mensuales</strong> cargados (por ejemplo, el mes actual y el anterior) para calcular el cash flow por variación de balance. Actualmente hay ${conBalance.length} balance${conBalance.length===1?'':'s'} cargado${conBalance.length===1?'':'s'}.
+      Se necesita el balance del periodo actual junto con el cierre de diciembre del año anterior (incluido automáticamente al cargar el Excel del balance, columna "saldo_anterior") para calcular el cash flow. Actualmente hay ${conBalance.length} balance${conBalance.length===1?'':'s'} cargado${conBalance.length===1?'':'s'}.
     </p>`;
     return;
   }
@@ -2341,9 +2341,16 @@ function renderCashFlow(d){
 
   const g=(r,campo)=>r[campo]||0;
 
-  // EBITDA del mes actual (operativo, antes de variaciones de circulante)
-  const mbActual = g(actual,'ingresos') - g(actual,'coste_mercancia');
-  const ebitdaActual = mbActual - g(actual,'gastos_personal') - g(actual,'gastos_logistica') - g(actual,'gastos_generales');
+  // EBITDA acumulado del ejercicio (YTD): desde enero hasta el mes del balance actual, mismo año.
+  // Esto es coherente con que el balance compara contra el cierre del ejercicio anterior (31/dic).
+  const filasYTD = d.filter(r=>r.año===actual.año && r.mes<=actual.mes);
+  const ingYTD = filasYTD.reduce((a,r)=>a+(r.ingresos||0),0);
+  const cmYTD = filasYTD.reduce((a,r)=>a+(r.coste_mercancia||0),0);
+  const gpYTD = filasYTD.reduce((a,r)=>a+(r.gastos_personal||0),0);
+  const glYTD = filasYTD.reduce((a,r)=>a+(r.gastos_logistica||0),0);
+  const ggYTD = filasYTD.reduce((a,r)=>a+(r.gastos_generales||0),0);
+  const mbActual = ingYTD - cmYTD;
+  const ebitdaActual = mbActual - gpYTD - glYTD - ggYTD;
 
   // Variaciones de balance entre el periodo anterior y el actual
   const varExistencias = g(actual,'existencias') - g(anterior,'existencias');
@@ -2382,10 +2389,10 @@ function renderCashFlow(d){
 
   el.innerHTML = `
     <p style="font-size:12.5px; color:var(--text-light); margin-bottom:1rem;">
-      Comparativa entre <strong>${labelAnterior}</strong> y <strong>${labelActual}</strong> (los dos balances más recientes disponibles).
+      Cash flow acumulado del ejercicio (YTD): desde el cierre de <strong>${labelAnterior}</strong> hasta <strong>${labelActual}</strong>.
     </p>
     <div class="pnl-section">Actividades de explotación</div>
-    ${fila('EBITDA del periodo', ebitdaActual)}
+    ${fila('EBITDA acumulado del ejercicio (YTD)', ebitdaActual)}
     ${fila('− Variación de existencias', -varExistencias)}
     ${fila('− Variación de clientes/deudores', -varClientes)}
     ${fila('+ Variación de proveedores y otros acreedores', varProveedores)}
@@ -2681,6 +2688,7 @@ function parseBalanceXLSX(buffer){
   const headers=(raw[0]||[]).map(h=>String(h||'').trim().toLowerCase());
   const idxTitulo=headers.indexOf('titulo');
   const idxSaldo=headers.indexOf('saldo');
+  const idxSaldoAnt=headers.indexOf('saldo_anterior');
   if(idxTitulo===-1||idxSaldo===-1) throw new Error('No se encontraron las columnas "titulo" y "saldo" en el Excel.');
 
   // Epígrafes principales del balance PGC (líneas de sección sin "cuenta", en mayúsculas)
@@ -2704,15 +2712,22 @@ function parseBalanceXLSX(buffer){
   const mapaPasivoCorriente = { 'iii.- deudas a corto plazo.': 'deuda_corto_plazo' };
 
   const resultado = {};
+  const resultadoAnterior = {};
   let seccionActual = null; // 'activo_corriente' | 'pasivo_no_corriente' | 'pasivo_corriente' | null
+
+  function asignar(campo, fila, idxCol){
+    const v = parseFloat(fila[idxCol]);
+    return isNaN(v) ? 0 : v;
+  }
 
   raw.slice(1).forEach(row=>{
     const tituloOriginal = String(row[idxTitulo]||'').trim();
     const titulo = tituloOriginal.toLowerCase();
-    const saldo = parseFloat(row[idxSaldo]);
 
     if(mapaPrincipales[titulo]){
-      resultado[mapaPrincipales[titulo]] = isNaN(saldo) ? 0 : saldo;
+      const campo=mapaPrincipales[titulo];
+      resultado[campo] = asignar(campo,row,idxSaldo);
+      if(idxSaldoAnt!==-1) resultadoAnterior[campo] = asignar(campo,row,idxSaldoAnt);
       if(titulo==='b.- activo corriente') seccionActual='activo_corriente';
       else if(titulo==='b.- pasivo no corriente') seccionActual='pasivo_no_corriente';
       else if(titulo==='c.- pasivo corriente') seccionActual='pasivo_corriente';
@@ -2720,12 +2735,14 @@ function parseBalanceXLSX(buffer){
       return;
     }
 
-    if(seccionActual==='activo_corriente' && mapaActivoCorriente[titulo]!==undefined){
-      resultado[mapaActivoCorriente[titulo]] = isNaN(saldo) ? 0 : saldo;
-    } else if(seccionActual==='pasivo_no_corriente' && mapaPasivoNoCorriente[titulo]!==undefined){
-      resultado[mapaPasivoNoCorriente[titulo]] = isNaN(saldo) ? 0 : saldo;
-    } else if(seccionActual==='pasivo_corriente' && mapaPasivoCorriente[titulo]!==undefined){
-      resultado[mapaPasivoCorriente[titulo]] = isNaN(saldo) ? 0 : saldo;
+    let campo=null;
+    if(seccionActual==='activo_corriente' && mapaActivoCorriente[titulo]!==undefined) campo=mapaActivoCorriente[titulo];
+    else if(seccionActual==='pasivo_no_corriente' && mapaPasivoNoCorriente[titulo]!==undefined) campo=mapaPasivoNoCorriente[titulo];
+    else if(seccionActual==='pasivo_corriente' && mapaPasivoCorriente[titulo]!==undefined) campo=mapaPasivoCorriente[titulo];
+
+    if(campo){
+      resultado[campo] = asignar(campo,row,idxSaldo);
+      if(idxSaldoAnt!==-1) resultadoAnterior[campo] = asignar(campo,row,idxSaldoAnt);
     }
   });
 
@@ -2734,7 +2751,7 @@ function parseBalanceXLSX(buffer){
   if(encontrados.length===0){
     throw new Error('No se reconoció ningún epígrafe del balance (Activo no corriente, Activo corriente, Patrimonio neto, Pasivo...). Verifica que la columna "titulo" tenga el formato esperado.');
   }
-  return resultado;
+  return {actual: resultado, anterior: resultadoAnterior};
 }
 
 function loadBalanceFile(e){
@@ -2744,18 +2761,27 @@ function loadBalanceFile(e){
   if(!isXLSX){ alert('El balance debe subirse como archivo Excel (.xlsx).'); return; }
   reader.onload=ev=>{
     try{
-      const datosBalance = parseBalanceXLSX(ev.target.result);
+      const {actual, anterior} = parseBalanceXLSX(ev.target.result);
       const {mes, año, mesNombre} = detectarPeriodoBalance(file.name);
 
-      // Buscar si ya existe una fila de finData para ese mes/año; si no, crear una nueva
-      let fila = finData.find(r=>r.mes===mes && r.año===año);
-      if(!fila){
-        fila = {año, mes, ingresos:0, coste_mercancia:0, gastos_personal:0, gastos_logistica:0, gastos_generales:0, amortizacion:0, gastos_financieros:0};
-        finData.push(fila);
+      function upsertFila(datosBalance, mesObjetivo, añoObjetivo){
+        let fila = finData.find(r=>r.mes===mesObjetivo && r.año===añoObjetivo);
+        if(!fila){
+          fila = {año:añoObjetivo, mes:mesObjetivo, ingresos:0, coste_mercancia:0, gastos_personal:0, gastos_logistica:0, gastos_generales:0, amortizacion:0, gastos_financieros:0};
+          finData.push(fila);
+        }
+        Object.assign(fila, datosBalance);
       }
-      Object.assign(fila, datosBalance);
 
-      const msg = `${file.name} — Balance de ${mesNombre} ${año} cargado`;
+      // Periodo actual (columna "saldo")
+      upsertFila(actual, mes, año);
+
+      // Periodo anterior (columna "saldo_anterior") = cierre del ejercicio anterior (31 de diciembre del año pasado)
+      const mesAnt = 11, añoAnt = año-1; // Diciembre del año anterior
+      const hayDatosAnterior = Object.keys(anterior).length>0;
+      if(hayDatosAnterior) upsertFila(anterior, mesAnt, añoAnt);
+
+      const msg = `${file.name} — Balance de ${mesNombre} ${año} cargado${hayDatosAnterior?' (con periodo anterior)':''}`;
       document.getElementById('balance-status').textContent = '✓ '+msg+' — guardando para todos…';
       document.getElementById('upload-panel').classList.remove('open');
       document.getElementById('toggle-global').classList.remove('open');
