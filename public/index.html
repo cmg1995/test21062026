@@ -315,6 +315,7 @@
   <div class="upload-panel-tabs">
     <button class="upload-panel-tab active" onclick="switchUploadTab('op',this)">📦 Operacional</button>
     <button class="upload-panel-tab" onclick="switchUploadTab('fin',this)">💰 Financiero</button>
+    <button class="upload-panel-tab" onclick="switchUploadTab('balance',this)">📊 Balance</button>
   </div>
 
   <div id="upload-tab-op" class="upload-tab-content active">
@@ -327,8 +328,6 @@
         Cargar CSV / Excel
         <input type="file" accept=".csv,.xlsx,.xls" onchange="loadOpFile(event)">
       </label>
-      <button class="btn" onclick="showModal('op')">Ver formato</button>
-      <button class="btn" onclick="downloadTemplate('op')">Descargar plantilla</button>
     </div>
   </div>
 
@@ -342,9 +341,23 @@
         Cargar CSV / Excel
         <input type="file" accept=".csv,.xlsx,.xls" onchange="loadFinFile(event)">
       </label>
-      <button class="btn" onclick="showModal('fin')">Ver formato</button>
-      <button class="btn" onclick="downloadTemplate('fin')">Descargar plantilla</button>
     </div>
+  </div>
+
+  <div id="upload-tab-balance" class="upload-tab-content">
+    <div class="upload-tab-info">
+      <span id="balance-status">Sin balance cargado todavía.</span>
+    </div>
+    <div class="upload-actions">
+      <label class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Cargar Balance (Excel)
+        <input type="file" accept=".csv,.xlsx,.xls" onchange="loadBalanceFile(event)">
+      </label>
+    </div>
+    <p style="font-size:12.5px; color:var(--text-light); margin-top:0.6rem; max-width:480px;">
+      Sube el balance de situación (formato PGC, con columnas <strong>cuenta</strong>, <strong>titulo</strong>, <strong>saldo</strong>, <strong>saldo_anterior</strong>). El periodo (mes y año) se detecta automáticamente a partir del nombre del archivo — por ejemplo, "BS_Junio_YTD.xlsx" se interpreta como Junio del año en curso.
+    </p>
   </div>
 </div>
 
@@ -549,6 +562,11 @@
   <div class="card">
     <div class="card-title">📐 Ratios financieros</div>
     <div class="ratios-grid" id="ratios-grid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💵 CASH FLOW</div>
+    <div id="cashflow-content"></div>
   </div>
 
 </div>
@@ -2112,6 +2130,7 @@ function renderFin(){
   // Ratios con último periodo disponible
   const last=d[d.length-1]||{};
   renderRatios({ing, mb, ebit, ebitda, am, d, last});
+  renderCashFlow(d);
 }
 
 function renderRatios({ing, mb, ebit, ebitda, am, d, last}){
@@ -2303,6 +2322,99 @@ function renderRatios({ing, mb, ebit, ebitda, am, d, last}){
   `).join('');
 }
 
+function renderCashFlow(d){
+  const el = document.getElementById('cashflow-content');
+  // Solo nos interesan los meses que tienen datos de balance (activos_circulante definido)
+  const conBalance = d.filter(r=>r.activos_circulante!==undefined && r.activos_circulante!==null);
+
+  if(conBalance.length < 2){
+    el.innerHTML = `<p style="color:var(--text-light); font-size:13.5px;">
+      Se necesitan al menos <strong>dos balances mensuales</strong> cargados (por ejemplo, el mes actual y el anterior) para calcular el cash flow por variación de balance. Actualmente hay ${conBalance.length} balance${conBalance.length===1?'':'s'} cargado${conBalance.length===1?'':'s'}.
+    </p>`;
+    return;
+  }
+
+  const actual = conBalance[conBalance.length-1];
+  const anterior = conBalance[conBalance.length-2];
+  const labelActual = MESES_FULL[actual.mes]+' '+actual.año;
+  const labelAnterior = MESES_FULL[anterior.mes]+' '+anterior.año;
+
+  const g=(r,campo)=>r[campo]||0;
+
+  // EBITDA del mes actual (operativo, antes de variaciones de circulante)
+  const mbActual = g(actual,'ingresos') - g(actual,'coste_mercancia');
+  const ebitdaActual = mbActual - g(actual,'gastos_personal') - g(actual,'gastos_logistica') - g(actual,'gastos_generales');
+
+  // Variaciones de balance entre el periodo anterior y el actual
+  const varExistencias = g(actual,'existencias') - g(anterior,'existencias');
+  const varClientes = g(actual,'clientes_deudores') - g(anterior,'clientes_deudores');
+  // Proveedores no se captura directamente del balance; se aproxima con la variación de pasivo corriente
+  // no financiero (pasivo corriente total menos deuda financiera a corto plazo)
+  const proveedoresActual = g(actual,'pasivo_corriente') - g(actual,'deuda_corto_plazo');
+  const proveedoresAnterior = g(anterior,'pasivo_corriente') - g(anterior,'deuda_corto_plazo');
+  const varProveedores = proveedoresActual - proveedoresAnterior;
+
+  // 1. Flujo de caja operativo
+  const fcOperativo = ebitdaActual - varExistencias - varClientes + varProveedores;
+
+  // 2. Flujo de caja de inversión (variación del activo no corriente, aproximado)
+  const varActivoFijo = g(actual,'activos_fijos') - g(anterior,'activos_fijos');
+  const fcInversion = -varActivoFijo;
+
+  // 3. Flujo de caja de financiación (variación de deuda financiera + variación de patrimonio neto)
+  const deudaActual = g(actual,'deuda_largo_plazo') + g(actual,'deuda_corto_plazo');
+  const deudaAnterior = g(anterior,'deuda_largo_plazo') + g(anterior,'deuda_corto_plazo');
+  const varDeuda = deudaActual - deudaAnterior;
+  const varPatrimonio = g(actual,'patrimonio_neto') - g(anterior,'patrimonio_neto');
+  const fcFinanciacion = varDeuda + varPatrimonio;
+
+  // Variación neta calculada vs. variación real de tesorería (para verificar consistencia)
+  const variacionNetaCalculada = fcOperativo + fcInversion + fcFinanciacion;
+  const variacionTesoreriaReal = g(actual,'tesoreria') - g(anterior,'tesoreria');
+  const diferencia = variacionNetaCalculada - variacionTesoreriaReal;
+  const hayDescuadre = Math.abs(diferencia) > Math.max(Math.abs(variacionTesoreriaReal)*0.05, 500);
+
+  const fila=(label,val,esTotal)=>`
+    <div class="pnl-row ${esTotal?'subtotal':''}" style="${esTotal?'':'border-bottom:1px solid #f0f2ef;'}">
+      <span class="${esTotal?'':'pnl-indent'}">${label}</span>
+      <span class="val ${val<0?'neg':'pos'}">${fmtE(val)}</span>
+    </div>`;
+
+  el.innerHTML = `
+    <p style="font-size:12.5px; color:var(--text-light); margin-bottom:1rem;">
+      Comparativa entre <strong>${labelAnterior}</strong> y <strong>${labelActual}</strong> (los dos balances más recientes disponibles).
+    </p>
+    <div class="pnl-section">Actividades de explotación</div>
+    ${fila('EBITDA del periodo', ebitdaActual)}
+    ${fila('− Variación de existencias', -varExistencias)}
+    ${fila('− Variación de clientes/deudores', -varClientes)}
+    ${fila('+ Variación de proveedores y otros acreedores', varProveedores)}
+    ${fila('Flujo de caja operativo', fcOperativo, true)}
+
+    <div class="pnl-section">Actividades de inversión</div>
+    ${fila('− Variación de activo no corriente (inmovilizado)', -varActivoFijo)}
+    ${fila('Flujo de caja de inversión', fcInversion, true)}
+
+    <div class="pnl-section">Actividades de financiación</div>
+    ${fila('Variación de deuda financiera (largo + corto plazo)', varDeuda)}
+    ${fila('Variación de patrimonio neto', varPatrimonio)}
+    ${fila('Flujo de caja de financiación', fcFinanciacion, true)}
+
+    <div class="pnl-section">Resumen</div>
+    ${fila('Variación neta de tesorería (calculada)', variacionNetaCalculada, true)}
+    ${fila('Variación real de tesorería (según balance)', variacionTesoreriaReal)}
+    ${hayDescuadre ? `
+      <p style="font-size:12px; color:#b3392c; margin-top:0.6rem;">
+        ⚠ Hay una diferencia de ${fmtE(diferencia)} entre el flujo calculado y la variación real de tesorería. Esto puede deberse a movimientos no capturados por este modelo simplificado (ej. provisiones, periodificaciones, ajustes de valor, o epígrafes de balance no incluidos en este cálculo).
+      </p>
+    ` : `
+      <p style="font-size:12px; color:var(--text-light); margin-top:0.6rem;">
+        ✓ El flujo calculado es coherente con la variación real de tesorería (diferencia de ${fmtE(diferencia)}).
+      </p>
+    `}
+  `;
+}
+
 // ——— LOAD FILES ———
 function parseCSV(text){
   const lines=text.trim().split(/\r?\n/);
@@ -2451,7 +2563,7 @@ function parseExtractoContable(wb, wsName){
       d=new Date(fecha);
     }
     if(isNaN(d.getTime())) return;
-    const año=d.getFullYear(), mes=d.getMonth()+1;
+    const año=d.getFullYear(), mes=d.getMonth(); // formato 0-11 (Ene=0), igual que selectedMonthsFin y MESES
 
     const debe=parseFloat(row[idx.debe])||0;
     const haber=parseFloat(row[idx.haber])||0;
@@ -2549,6 +2661,109 @@ function loadFinFile(e){
     }catch(err){alert('Error al leer el archivo: '+err.message);}
   };
   isXLSX?reader.readAsArrayBuffer(file):reader.readAsText(file,'UTF-8');
+}
+
+// ——— BALANCE DE SITUACIÓN ———
+// Detecta el mes a partir del nombre del archivo (ej. "BS_Junio_YTD.xlsx" -> Junio) y el año actual.
+const MESES_BALANCE_REGEX = MESES_FULL.map((m,i)=>({nombre:m.toLowerCase(), idx:i}));
+function detectarPeriodoBalance(nombreArchivo){
+  const nombreLower = nombreArchivo.toLowerCase();
+  const encontrado = MESES_BALANCE_REGEX.find(m=>nombreLower.includes(m.nombre));
+  const mes = encontrado ? encontrado.idx : new Date().getMonth();
+  const año = new Date().getFullYear();
+  return {mes, año, mesNombre: encontrado ? MESES_FULL[encontrado.idx] : MESES_FULL[mes]};
+}
+
+function parseBalanceXLSX(buffer){
+  const wb=XLSX.read(buffer,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1});
+  const headers=(raw[0]||[]).map(h=>String(h||'').trim().toLowerCase());
+  const idxTitulo=headers.indexOf('titulo');
+  const idxSaldo=headers.indexOf('saldo');
+  if(idxTitulo===-1||idxSaldo===-1) throw new Error('No se encontraron las columnas "titulo" y "saldo" en el Excel.');
+
+  // Epígrafes principales del balance PGC (líneas de sección sin "cuenta", en mayúsculas)
+  const mapaPrincipales = {
+    'a.- activo no corriente': 'activos_fijos',
+    'b.- activo corriente': 'activos_circulante',
+    'a.- patrimonio neto': 'patrimonio_neto',
+    'b.- pasivo no corriente': 'pasivo_no_corriente',
+    'c.- pasivo corriente': 'pasivo_corriente'
+  };
+  // Sub-epígrafes dentro de "B.- Activo corriente" (activo)
+  const mapaActivoCorriente = {
+    'ii.- existencias': 'existencias',
+    'iii.- deudores comerciales y otras cuentas a cobrar': 'clientes_deudores',
+    'vii.- efectivo y otros activos liquidos equivalente': 'tesoreria',
+    'vii.- efectivo y otros activos líquidos equivalente': 'tesoreria'
+  };
+  // Sub-epígrafe dentro de "B.- Pasivo no corriente" (deuda largo plazo)
+  const mapaPasivoNoCorriente = { 'ii.- deudas a largo plazo.': 'deuda_largo_plazo' };
+  // Sub-epígrafe dentro de "C.- Pasivo corriente" (deuda corto plazo)
+  const mapaPasivoCorriente = { 'iii.- deudas a corto plazo.': 'deuda_corto_plazo' };
+
+  const resultado = {};
+  let seccionActual = null; // 'activo_corriente' | 'pasivo_no_corriente' | 'pasivo_corriente' | null
+
+  raw.slice(1).forEach(row=>{
+    const tituloOriginal = String(row[idxTitulo]||'').trim();
+    const titulo = tituloOriginal.toLowerCase();
+    const saldo = parseFloat(row[idxSaldo]);
+
+    if(mapaPrincipales[titulo]){
+      resultado[mapaPrincipales[titulo]] = isNaN(saldo) ? 0 : saldo;
+      if(titulo==='b.- activo corriente') seccionActual='activo_corriente';
+      else if(titulo==='b.- pasivo no corriente') seccionActual='pasivo_no_corriente';
+      else if(titulo==='c.- pasivo corriente') seccionActual='pasivo_corriente';
+      else seccionActual=null;
+      return;
+    }
+
+    if(seccionActual==='activo_corriente' && mapaActivoCorriente[titulo]!==undefined){
+      resultado[mapaActivoCorriente[titulo]] = isNaN(saldo) ? 0 : saldo;
+    } else if(seccionActual==='pasivo_no_corriente' && mapaPasivoNoCorriente[titulo]!==undefined){
+      resultado[mapaPasivoNoCorriente[titulo]] = isNaN(saldo) ? 0 : saldo;
+    } else if(seccionActual==='pasivo_corriente' && mapaPasivoCorriente[titulo]!==undefined){
+      resultado[mapaPasivoCorriente[titulo]] = isNaN(saldo) ? 0 : saldo;
+    }
+  });
+
+  const camposEsperados=['activos_fijos','activos_circulante','patrimonio_neto','pasivo_no_corriente','pasivo_corriente'];
+  const encontrados=camposEsperados.filter(c=>resultado[c]!==undefined);
+  if(encontrados.length===0){
+    throw new Error('No se reconoció ningún epígrafe del balance (Activo no corriente, Activo corriente, Patrimonio neto, Pasivo...). Verifica que la columna "titulo" tenga el formato esperado.');
+  }
+  return resultado;
+}
+
+function loadBalanceFile(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  const isXLSX=file.name.match(/\.xlsx?$/i);
+  if(!isXLSX){ alert('El balance debe subirse como archivo Excel (.xlsx).'); return; }
+  reader.onload=ev=>{
+    try{
+      const datosBalance = parseBalanceXLSX(ev.target.result);
+      const {mes, año, mesNombre} = detectarPeriodoBalance(file.name);
+
+      // Buscar si ya existe una fila de finData para ese mes/año; si no, crear una nueva
+      let fila = finData.find(r=>r.mes===mes && r.año===año);
+      if(!fila){
+        fila = {año, mes, ingresos:0, coste_mercancia:0, gastos_personal:0, gastos_logistica:0, gastos_generales:0, amortizacion:0, gastos_financieros:0};
+        finData.push(fila);
+      }
+      Object.assign(fila, datosBalance);
+
+      const msg = `${file.name} — Balance de ${mesNombre} ${año} cargado`;
+      document.getElementById('balance-status').textContent = '✓ '+msg+' — guardando para todos…';
+      document.getElementById('upload-panel').classList.remove('open');
+      document.getElementById('toggle-global').classList.remove('open');
+      populateFinFilters(); renderFin();
+      guardarDatosRemoto('financiero', finData, 'balance-status', '✓ '+msg);
+    }catch(err){ alert('Error al leer el balance: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ——— GUARDADO/CARGA REMOTA (Netlify Functions + Blobs) ———
